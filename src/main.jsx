@@ -1,133 +1,1227 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   ArrowLeft, ArrowRight, Bell, Check, ChevronDown, Clock3, CloudUpload,
   Download, FileCheck2, FileText, Filter, HelpCircle, LayoutDashboard,
   LockKeyhole, LogOut, Menu, MoreHorizontal, Plus, Search, ShieldCheck,
-  SlidersHorizontal, UploadCloud, UserRound, UsersRound, X
+  SlidersHorizontal, UploadCloud, UsersRound, X, AlertTriangle
 } from 'lucide-react';
+import { api } from './api';
 import './styles.css';
 
-const records = [
-  { id: 'DJ-2024-00482', rut: '76.***.***-2', issuer: 'Banco de Chile', year: '2024', country: 'Chile', type: 'Declaración jurada', status: 'Validado', date: '12 oct 2024', amount: '$18.450.000' },
-  { id: 'DJ-2024-00481', rut: '96.***.***-8', issuer: 'LarrainVial S.A.', year: '2024', country: 'Chile', type: 'Certificado emisor', status: 'Pendiente', date: '10 oct 2024', amount: '$9.820.000' },
-  { id: 'DJ-2023-00317', rut: '76.***.***-2', issuer: 'BCI Corredor de Bolsa', year: '2023', country: 'Chile', type: 'Declaración jurada', status: 'Validado', date: '08 oct 2024', amount: '$12.600.000' },
-  { id: 'DJ-2024-00479', rut: '77.***.***-4', issuer: 'Credicorp Capital', year: '2024', country: 'Perú', type: 'Declaración jurada', status: 'En revisión', date: '05 oct 2024', amount: '$6.340.000' }
-];
-
-const approvals = [
-  { title: 'Entrega de respaldo · Fiscalización SII', ref: 'REQ-2024-018', owner: 'Camila Rojas', records: '12 documentos', time: 'Hace 18 min', priority: 'Alta' },
-  { title: 'Conciliación de certificados · Octubre', ref: 'REQ-2024-017', owner: 'Javier Soto', records: '8 documentos', time: 'Hace 2 h', priority: 'Media' },
-  { title: 'Solicitud de respaldo histórico', ref: 'REQ-2024-014', owner: 'Valentina Díaz', records: '4 documentos', time: 'Ayer', priority: 'Baja' }
-];
-
 function Logo({ light = false }) {
-  return <div className={`logo ${light ? 'logo-light' : ''}`}><span className="logo-mark">n</span><span>nuam</span></div>;
+  return (
+    <div className={`logo ${light ? 'logo-light' : ''}`}>
+      <span className="logo-mark">n</span>
+      <span>nuam</span>
+    </div>
+  );
 }
 
-function Login({ onLogin }) {
+function Login({ onLoginSuccess }) {
   const [step, setStep] = useState('credentials');
-  const [email, setEmail] = useState('rodrigo.carrasco56@inacapmail.cl');
+  const [email, setEmail] = useState('camila.vargas@nuam.com');
   const [password, setPassword] = useState('Admin1234*');
+  const [twoFactorCode, setTwoFactorCode] = useState(['1', '2', '3', '4', '5', '6']);
   const [error, setError] = useState('');
-  return <main className="login-page">
-    <section className="login-art">
-      <Logo light />
-      <div className="art-copy">
-        <span className="eyebrow">GESTIÓN TRIBUTARIA</span>
-        <h1>Tu información,<br /><em>siempre segura.</em></h1>
-        <p>Centraliza, gestiona y recupera tus respaldos tributarios con trazabilidad de extremo a extremo.</p>
-        <div className="security-pills"><span><ShieldCheck size={15} /> Protección desde el origen</span><span><LockKeyhole size={15} /> Datos cifrados</span></div>
-      </div>
-      <div className="art-footer">© 2024 nuam · Plataforma segura</div>
-    </section>
-    <section className="login-card-wrap">
-      <div className="login-card">
-        <div className="mobile-logo"><Logo /></div>
-        <div className="login-heading"><span className="step-label">{step === 'credentials' ? '01 / 02' : '02 / 02'}</span><h2>{step === 'credentials' ? 'Bienvenido de vuelta' : 'Verificación en dos pasos'}</h2><p>{step === 'credentials' ? 'Ingresa tus credenciales para continuar.' : 'Ingresa el código enviado a tu dispositivo registrado.'}</p></div>
-        {step === 'credentials' ? <form onSubmit={e => { e.preventDefault(); if (email !== 'rodrigo.carrasco56@inacapmail.cl' || password !== 'Admin1234*') { setError('El correo o la contraseña no coinciden con un usuario registrado.'); return; } setError(''); setStep('mfa'); }}>
-          <label>Correo corporativo<input type="email" placeholder="nombre@empresa.com" value={email} onChange={e => setEmail(e.target.value)} required /></label>
-          <label>Contraseña <a href="#">¿La olvidaste?</a><input type="password" placeholder="Ingresa tu contraseña" value={password} onChange={e => setPassword(e.target.value)} required /></label>
-          {error && <div className="form-error">{error}</div>}
-          <button className="primary full" type="submit">Continuar <ArrowRight size={17} /></button>
-        </form> : <form onSubmit={e => { e.preventDefault(); onLogin(); }}>
-          <div className="otp-row">{[0, 1, 2, 3, 4, 5].map(i => <input key={i} maxLength="1" inputMode="numeric" autoFocus={i === 0} aria-label={`Dígito ${i + 1}`} />)}</div>
-          <p className="muted center">El código expira en <strong>04:52</strong></p>
-          <button className="primary full" type="submit">Verificar acceso <ShieldCheck size={17} /></button>
-          <button className="text-button full" type="button" onClick={() => setStep('credentials')}><ArrowLeft size={15} /> Volver a credenciales</button>
-        </form>}
-        <div className="login-note"><LockKeyhole size={14} /> Tu sesión estará protegida y se cerrará por inactividad.</div>
-      </div>
-      <p className="login-help"><HelpCircle size={14} /> ¿Necesitas ayuda? Contacta a <a href="#">Soporte nuam</a></p>
-    </section>
-  </main>;
+  const [loading, setLoading] = useState(false);
+
+  const handleCredentialsSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await api.auth.login(email, password);
+      if (res.requires_2fa) {
+        setStep('mfa');
+      } else {
+        onLoginSuccess(res.user);
+      }
+    } catch (err) {
+      setError(err.message || 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfaSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    const code = twoFactorCode.join('');
+    try {
+      const res = await api.auth.login(email, password, code);
+      onLoginSuccess(res.user);
+    } catch (err) {
+      setError(err.message || 'Código de segundo factor inválido');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index, val) => {
+    if (val.length > 1) val = val[0];
+    const newArr = [...twoFactorCode];
+    newArr[index] = val;
+    setTwoFactorCode(newArr);
+    if (val && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  return (
+    <main className="login-page">
+      <section className="login-art">
+        <Logo light />
+        <div className="art-copy">
+          <span className="eyebrow">GESTIÓN TRIBUTARIA</span>
+          <h1>Tu información,<br /><em>siempre segura.</em></h1>
+          <p>Centraliza, gestiona y recupera tus respaldos tributarios con trazabilidad de extremo a extremo.</p>
+          <div className="security-pills">
+            <span><ShieldCheck size={15} /> Protección desde el origen</span>
+            <span><LockKeyhole size={15} /> JWT & Cifrado AES-256</span>
+          </div>
+        </div>
+        <div className="art-footer">© 2026 nuam · Plataforma segura</div>
+      </section>
+
+      <section className="login-card-wrap">
+        <div className="login-card">
+          <div className="mobile-logo"><Logo /></div>
+          <div className="login-heading">
+            <span className="step-label">{step === 'credentials' ? '01 / 02' : '02 / 02'}</span>
+            <h2>{step === 'credentials' ? 'Inicio de sesión' : 'Verificación en dos pasos (2FA)'}</h2>
+            <p>
+              {step === 'credentials'
+                ? 'Ingresa tus credenciales institucionales para acceder.'
+                : 'Ingresa el código de 6 dígitos de tu aplicación de autenticación.'}
+            </p>
+          </div>
+
+          {step === 'credentials' ? (
+            <form onSubmit={handleCredentialsSubmit}>
+              <label>
+                Correo institucional
+                <input
+                  type="email"
+                  placeholder="nombre@nuam.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Contraseña
+                <input
+                  type="password"
+                  placeholder="Ingresa tu contraseña"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </label>
+              {error && <div className="form-error">{error}</div>}
+              <button className="primary full" type="submit" disabled={loading}>
+                {loading ? 'Validando...' : 'Continuar'} <ArrowRight size={17} />
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleMfaSubmit}>
+              <div className="otp-row">
+                {twoFactorCode.map((digit, i) => (
+                  <input
+                    key={i}
+                    id={`otp-${i}`}
+                    maxLength="1"
+                    inputMode="numeric"
+                    value={digit}
+                    onChange={(e) => handleOtpChange(i, e.target.value)}
+                    autoFocus={i === 0}
+                    aria-label={`Dígito ${i + 1}`}
+                  />
+                ))}
+              </div>
+              <p className="muted center">Código de demostración precargado: <strong>123456</strong></p>
+              {error && <div className="form-error">{error}</div>}
+              <button className="primary full" type="submit" disabled={loading}>
+                {loading ? 'Verificando...' : 'Ingresar'} <ShieldCheck size={17} />
+              </button>
+              <button
+                className="text-button full"
+                type="button"
+                onClick={() => setStep('credentials')}
+              >
+                <ArrowLeft size={15} /> Volver a credenciales
+              </button>
+            </form>
+          )}
+
+          <div className="login-note">
+            <LockKeyhole size={14} /> El acceso y las operaciones quedan registrados para fines de auditoría.
+          </div>
+        </div>
+        <p className="login-help">
+          <HelpCircle size={14} /> ¿Necesitas ayuda? Contacta a la <a href="#">Mesa de ayuda institucional</a>
+        </p>
+      </section>
+    </main>
+  );
 }
 
-function Sidebar({ screen, setScreen, onLogout }) {
-  const items = [['dashboard', 'Resumen', LayoutDashboard], ['records', 'Calificaciones', FileText], ['upload', 'Carga masiva', UploadCloud], ['approvals', 'Aprobaciones', FileCheck2]];
-  return <aside className="sidebar">
-    <div className="sidebar-top"><Logo /><button className="icon-btn menu-btn"><Menu size={19} /></button></div>
-    <div className="workspace"><div className="avatar">CR</div><div><strong>Corredora nuam</strong><small>Operador tributario</small></div><ChevronDown size={16} /></div>
-    <nav><span className="nav-caption">MENÚ PRINCIPAL</span>{items.map(([id, label, Icon]) => <button key={id} className={screen === id ? 'active' : ''} onClick={() => setScreen(id)}><Icon size={18} /><span>{label}</span>{id === 'approvals' && <b>3</b>}</button>)}<span className="nav-caption nav-lower">GESTIÓN</span><button onClick={() => setScreen('audit')} className={screen === 'audit' ? 'active' : ''}><ShieldCheck size={18} /><span>Auditoría</span></button><button onClick={() => setScreen('users')} className={screen === 'users' ? 'active' : ''}><UsersRound size={18} /><span>Usuarios y roles</span></button></nav>
-    <div className="sidebar-bottom"><div className="security-status"><span className="status-dot" /> <span><strong>Todo protegido</strong><small>Última revisión: hoy, 09:42</small></span></div><button className="logout" onClick={onLogout}><LogOut size={16} /> Cerrar sesión</button></div>
-  </aside>;
+function Sidebar({ screen, setScreen, onLogout, user, pendingApprovalsCount = 2 }) {
+  const items = [
+    ['dashboard', 'Búsqueda de documentos', Search],
+    ['upload', 'Carga masiva', UploadCloud],
+    ['approvals', 'Bandeja de aprobaciones', FileCheck2],
+    ['audit', 'Auditoría y trazabilidad', ShieldCheck],
+  ];
+
+  const roleDisplay = user?.profile?.role === 'supervisor' ? 'Supervisor tributario' : 'Operador tributario';
+  const userInitials = user?.first_name ? `${user.first_name[0]}${user.last_name ? user.last_name[0] : ''}` : 'NU';
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-top">
+        <Logo />
+        <button className="icon-btn menu-btn"><Menu size={19} /></button>
+      </div>
+
+      <div className="workspace">
+        <div className="avatar">{userInitials}</div>
+        <div>
+          <strong>{user?.first_name ? `${user.first_name} ${user.last_name || ''}` : 'Usuario nuam'}</strong>
+          <small>{roleDisplay}</small>
+        </div>
+        <ChevronDown size={16} />
+      </div>
+
+      <nav>
+        <span className="nav-caption">MÓDULOS PRINCIPALES</span>
+        {items.map(([id, label, Icon]) => (
+          <button
+            key={id}
+            className={screen === id ? 'active' : ''}
+            onClick={() => setScreen(id)}
+          >
+            <Icon size={18} />
+            <span>{label}</span>
+            {id === 'approvals' && pendingApprovalsCount > 0 && <b>{pendingApprovalsCount}</b>}
+          </button>
+        ))}
+      </nav>
+
+      <div className="sidebar-bottom">
+        <div className="security-status">
+          <span className="status-dot" />
+          <span>
+            <strong>Integridad SHA-256 Activa</strong>
+            <small>SQLite MVP · Supabase Ready</small>
+          </span>
+        </div>
+        <button className="logout" onClick={onLogout}>
+          <LogOut size={16} /> Cerrar sesión
+        </button>
+      </div>
+    </aside>
+  );
 }
 
-function Header({ title, subtitle, onMenu }) {
+function Header({ title, subtitle, onMenu, user, onLogout }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
-  return <header className="topbar"><button className="mobile-menu icon-btn" onClick={onMenu}><Menu size={20} /></button><div><h1>{title}</h1><p>{subtitle}</p></div><div className="top-actions"><div className="popover-wrap"><button className="icon-btn" onClick={() => setNotificationsOpen(!notificationsOpen)} aria-label="Mostrar alertas"><Bell size={19} /><i /></button>{notificationsOpen && <div className="popover notifications"><strong>Alertas</strong><p><ShieldCheck size={14} /> Integridad verificada en 3 documentos</p><p><Clock3 size={14} /> Tienes 3 aprobaciones pendientes</p><button className="link-button" onClick={() => setNotificationsOpen(false)}>Marcar como leídas</button></div>}</div><div className="popover-wrap"><button className="top-user" onClick={() => setUserOpen(!userOpen)}><div className="avatar small">RC</div><span>Rodrigo Carrasco <small>Operador tributario</small></span><ChevronDown size={15} /></button>{userOpen && <div className="popover user-menu"><strong>Rodrigo Carrasco</strong><small>rodrigo.carrasco56@inacapmail.cl</small><button onClick={() => window.alert('Perfil protegido por MFA.')}>Mi perfil</button><button onClick={() => window.alert('Preferencias guardadas localmente en esta demo.')}>Preferencias</button><button onClick={() => window.location.reload()}>Cerrar sesión</button></div>}</div></div></header>;
+
+  const roleName = user?.profile?.role === 'supervisor' ? 'Supervisor' : 'Operador';
+  const fullName = user?.first_name ? `${user.first_name} ${user.last_name || ''}` : 'Camila Vargas';
+  const initials = user?.first_name ? `${user.first_name[0]}${user.last_name ? user.last_name[0] : 'V'}` : 'CV';
+
+  return (
+    <header className="topbar">
+      <button className="mobile-menu icon-btn" onClick={onMenu}><Menu size={20} /></button>
+      <div>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+      </div>
+      <div className="top-actions">
+        <div className="popover-wrap">
+          <button
+            className="icon-btn"
+            onClick={() => setNotificationsOpen(!notificationsOpen)}
+            aria-label="Mostrar alertas"
+          >
+            <Bell size={19} /><i />
+          </button>
+          {notificationsOpen && (
+            <div className="popover notifications">
+              <strong>Alertas institucionales</strong>
+              <p><ShieldCheck size={14} /> Hash verificado en todos los expedientes</p>
+              <p><Clock3 size={14} /> Solicitudes pendientes de decisión al SII</p>
+              <button className="link-button" onClick={() => setNotificationsOpen(false)}>
+                Marcar como leídas
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="popover-wrap">
+          <button className="top-user" onClick={() => setUserOpen(!userOpen)}>
+            <div className="avatar small">{initials}</div>
+            <span>
+              {fullName} <small>{roleName}</small>
+            </span>
+            <ChevronDown size={15} />
+          </button>
+          {userOpen && (
+            <div className="popover user-menu">
+              <strong>{fullName}</strong>
+              <small>{user?.email || 'usuario@nuam.com'}</small>
+              <button onClick={() => window.alert(`Perfil: ${roleName} - País: ${user?.profile?.country || 'Chile'}`)}>
+                Mi perfil
+              </button>
+              <button onClick={onLogout}>Cerrar sesión</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
 }
 
-function Dashboard({ setScreen, setSelected }) {
+function Dashboard({ setScreen, setSelectedRecord, user, onLogout }) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('Todos');
-  const filtered = useMemo(() => records.filter(r => (filter === 'Todos' || r.status === filter) && Object.values(r).join(' ').toLowerCase().includes(query.toLowerCase())), [query, filter]);
-  return <><Header title="Resumen" subtitle="Jueves, 17 de octubre de 2024 · Buenos días, Carlos" /><div className="page-content">
-    <div className="welcome-row"><div><span className="eyebrow dark">VISTA GENERAL</span><h2>Tu operación tributaria</h2></div><button className="primary" onClick={() => setScreen('upload')}><Plus size={17} /> Nueva carga</button></div>
-    <div className="stat-grid"><div className="stat-card"><span className="stat-icon blue"><FileText size={18} /></span><span className="stat-label">Registros totales</span><strong>1.284</strong><small className="positive">↑ 12,4% <em>vs. mes anterior</em></small></div><div className="stat-card"><span className="stat-icon yellow"><Clock3 size={18} /></span><span className="stat-label">Pendientes de revisión</span><strong>18</strong><small className="neutral">Requieren atención</small></div><div className="stat-card"><span className="stat-icon green"><ShieldCheck size={18} /></span><span className="stat-label">Integridad verificada</span><strong>99,8%</strong><small className="positive">↑ 0,3% <em>últimos 30 días</em></small></div><div className="stat-card"><span className="stat-icon purple"><Download size={18} /></span><span className="stat-label">Descargas este mes</span><strong>247</strong><small className="neutral">18 hoy</small></div></div>
-    <div className="section-heading"><div><h3>Registros recientes</h3><p>Últimas calificaciones tributarias actualizadas</p></div><button className="link-button" onClick={() => setScreen('records')}>Ver todos <ArrowRight size={15} /></button></div>
-    <div className="table-card"><div className="table-toolbar"><div className="searchbox"><Search size={17} /><input placeholder="Buscar por RUT, emisor o ID..." value={query} onChange={e => setQuery(e.target.value)} /></div><div className="filter-tabs">{['Todos', 'Validado', 'Pendiente'].map(f => <button className={filter === f ? 'selected' : ''} key={f} onClick={() => setFilter(f)}>{f}</button>)}</div><button className="filter-btn" onClick={() => setFilter(filter === 'Todos' ? 'Pendiente' : 'Todos')}><SlidersHorizontal size={16} /> Filtrar <span>{filter === 'Todos' ? '2' : '1'}</span></button></div><RecordTable rows={filtered} onSelect={r => { setSelected(r); setScreen('detail'); }} /></div>
-    <div className="bottom-grid"><div className="activity-card"><div className="section-heading compact"><div><h3>Actividad reciente</h3><p>Eventos de seguridad y operación</p></div><button className="icon-btn" onClick={() => window.alert('No hay más eventos recientes.')}><MoreHorizontal size={18} /></button></div>{[['Descarga verificada', 'DJ-2024-00482 · hace 12 min', 'green'], ['Nueva carga procesada', 'Carga_tributaria_oct.csv · hace 1 h', 'blue'], ['Acceso de sesión', 'Inicio de sesión exitoso · hace 3 h', 'purple']].map(([a,b,c]) => <div className="activity" key={a}><span className={`activity-dot ${c}`}><Check size={12} /></span><div><strong>{a}</strong><small>{b}</small></div><ChevronDown size={14} className="activity-arrow" /></div>)}</div><div className="integrity-card"><div className="section-heading compact"><div><h3>Salud del sistema</h3><p>Estado de tus documentos</p></div><ShieldCheck className="green-icon" size={20} /></div><div className="progress-label"><span>Integridad de archivos</span><strong>99,8%</strong></div><div className="progress"><span /></div><div className="integrity-footer"><span><i className="status-dot" /> 1.281 verificados</span><span><i className="status-dot warn" /> 3 en revisión</span></div></div></div>
-  </div></>;
+  const [yearFilter, setYearFilter] = useState('Todos los ejercicios');
+  const [emisorFilter, setEmisorFilter] = useState('Todos los emisores');
+  const [typeFilter, setTypeFilter] = useState('Todos los documentos');
+  const [countryFilter, setCountryFilter] = useState('Todos los países');
+  const [statusTab, setStatusTab] = useState('Todos');
+
+  const fetchRecords = async () => {
+    setLoading(true);
+    try {
+      const data = await api.taxRecords.getAll({
+        search: query,
+        year: yearFilter,
+        emisor: emisorFilter,
+        doc_type: typeFilter,
+        country: countryFilter,
+        status: statusTab,
+      });
+      setRecords(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, [query, yearFilter, emisorFilter, typeFilter, countryFilter, statusTab]);
+
+  const handleDownloadPdf = async (e, rec) => {
+    e.stopPropagation();
+    try {
+      await api.taxRecords.downloadPdf(rec.id, `${rec.folio}.pdf`);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleSelect = (rec) => {
+    setSelectedRecord(rec);
+    setScreen('detail');
+  };
+
+  return (
+    <>
+      <Header
+        title="Búsqueda de documentos"
+        subtitle="Consulta certificados y respaldos tributarios desde un único lugar."
+        user={user}
+        onLogout={onLogout}
+      />
+      <div className="page-content">
+        <div className="welcome-row">
+          <div>
+            <span className="eyebrow dark">CONSULTA INDEXADA</span>
+            <h2>Búsqueda de documentos</h2>
+          </div>
+          <button className="primary" onClick={() => setScreen('upload')}>
+            <Plus size={17} /> Nueva carga masiva
+          </button>
+        </div>
+
+        {/* Barra de búsqueda principal */}
+        <div style={{ marginTop: '20px', background: '#fff', padding: '16px', borderRadius: '10px', border: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="searchbox" style={{ flex: 1, width: 'auto' }}>
+              <Search size={18} />
+              <input
+                placeholder="Buscar por RUT, nombre, folio o contenido..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <button className="primary" onClick={fetchRecords}>Buscar</button>
+          </div>
+          <small style={{ color: '#75839a', marginTop: '8px', display: 'block', fontSize: '11px' }}>
+            Búsqueda inteligente · Puedes combinar RUT, nombre, folio o contenido del documento.
+          </small>
+
+          {/* Filtros Dropdown */}
+          <div className="filter-dropdowns">
+            <select className="filter-select" value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+              <option value="Todos los ejercicios">Todos los ejercicios</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+              <option value="2023">2023</option>
+            </select>
+
+            <select className="filter-select" value={emisorFilter} onChange={(e) => setEmisorFilter(e.target.value)}>
+              <option value="Todos los emisores">Todos los emisores</option>
+              <option value="Inversiones Andinas">Inversiones Andinas S.A.</option>
+              <option value="Servicios del Pacífico">Servicios del Pacífico SpA</option>
+              <option value="Comercial Los Alerces">Comercial Los Alerces Ltda.</option>
+              <option value="Inversiones Cordillera">Inversiones Cordillera S.A.</option>
+            </select>
+
+            <select className="filter-select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+              <option value="Todos los documentos">Todos los documentos</option>
+              <option value="Certificado tributario">Certificado tributario</option>
+              <option value="Declaración jurada">Declaración jurada</option>
+            </select>
+
+            <select className="filter-select" value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)}>
+              <option value="Todos los países">Todos los países</option>
+              <option value="Chile">Chile</option>
+              <option value="Colombia">Colombia</option>
+              <option value="Peru">Perú</option>
+            </select>
+
+            <button
+              className="text-button"
+              style={{ fontSize: '11px' }}
+              onClick={() => {
+                setQuery('');
+                setYearFilter('Todos los ejercicios');
+                setEmisorFilter('Todos los emisores');
+                setTypeFilter('Todos los documentos');
+                setCountryFilter('Todos los países');
+                setStatusTab('Todos');
+              }}
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
+
+        {/* Tabla de Resultados */}
+        <div className="table-card" style={{ marginTop: '24px' }}>
+          <div className="table-toolbar">
+            <strong>Resultados encontrados · {records.length}</strong>
+            <div className="filter-tabs">
+              {['Todos', 'Pendiente de aprobación', 'Validado', 'Observado'].map((tab) => (
+                <button
+                  key={tab}
+                  className={statusTab === tab ? 'selected' : ''}
+                  onClick={() => setStatusTab(tab)}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>RUT / Folio</th>
+                  <th>Nombre / Emisor</th>
+                  <th>Año</th>
+                  <th>Estado</th>
+                  <th>Monto</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="6" className="empty">Cargando expedientes desde backend...</td></tr>
+                ) : records.length === 0 ? (
+                  <tr><td colSpan="6" className="empty">No se encontraron expedientes con esos filtros.</td></tr>
+                ) : (
+                  records.map((r) => (
+                    <tr key={r.id} onClick={() => handleSelect(r)}>
+                      <td>
+                        <strong>{r.rut}</strong>
+                        <small>{r.folio}</small>
+                      </td>
+                      <td>{r.company_name}</td>
+                      <td>{r.year}</td>
+                      <td>
+                        <span className={`badge ${
+                          r.status === 'Validado' ? 'success' :
+                          r.status.includes('Pendiente') ? 'warning' : 'neutral'
+                        }`}>
+                          <i /> {r.status}
+                        </span>
+                      </td>
+                      <td><strong>{r.formatted_amount}</strong></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            className="secondary"
+                            style={{ padding: '5px 9px', fontSize: '11px' }}
+                            onClick={(e) => { e.stopPropagation(); handleSelect(r); }}
+                          >
+                            <FileText size={13} /> Ver detalle
+                          </button>
+                          <button
+                            className="primary"
+                            style={{ padding: '5px 9px', fontSize: '11px' }}
+                            onClick={(e) => handleDownloadPdf(e, r)}
+                          >
+                            <Download size={13} /> Descargar PDF
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
-function RecordTable({ rows, onSelect }) {
-  const [open, setOpen] = useState(null);
-  return <div className="table-scroll"><table><thead><tr><th>ID / RUT</th><th>Emisor</th><th>Ejercicio</th><th>Tipo de documento</th><th>Estado</th><th>Actualizado</th><th /></tr></thead><tbody>{rows.map(r => <tr key={r.id} onClick={() => onSelect(r)}><td><strong>{r.id}</strong><small>{r.rut}</small></td><td>{r.issuer}</td><td>{r.year}</td><td>{r.type}</td><td><span className={`badge ${r.status === 'Validado' ? 'success' : r.status === 'Pendiente' ? 'warning' : 'info'}`}><i />{r.status}</span></td><td>{r.date}</td><td><div className="row-menu"><button className="row-action" onClick={e => { e.stopPropagation(); setOpen(open === r.id ? null : r.id); }}><MoreHorizontal size={17} /></button>{open === r.id && <div className="popover row-popover"><button onClick={e => { e.stopPropagation(); onSelect(r); }}>Ver detalle</button><button onClick={e => { e.stopPropagation(); window.alert(`Se preparó la descarga de ${r.id}.`); }}>Descargar</button></div>}</div></td></tr>)}</tbody></table>{!rows.length && <div className="empty">No se encontraron registros con esos filtros.</div>}</div>;
+function Detail({ record, setScreen, user, onLogout }) {
+  const [detailData, setDetailData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (record?.id) {
+      api.taxRecords.getById(record.id)
+        .then((data) => setDetailData(data))
+        .catch((err) => console.error(err))
+        .finally(() => setLoading(false));
+    }
+  }, [record]);
+
+  const rec = detailData || record;
+
+  const handleDownload = async () => {
+    try {
+      await api.taxRecords.downloadPdf(rec.id, `${rec.folio}.pdf`);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <>
+      <Header
+        title="Expediente tributario"
+        subtitle={`${rec?.company_name || 'Inversiones Andinas S.A.'} · RUT ${rec?.rut || '76.543.210-8'} · ${rec?.folio || 'CERT-2025-0148'}`}
+        user={user}
+        onLogout={onLogout}
+      />
+      <div className="page-content detail-page">
+        <button className="back-link" onClick={() => setScreen('dashboard')}>
+          <ArrowLeft size={15} /> Volver a búsqueda
+        </button>
+
+        <div className="detail-title">
+          <div>
+            <div className="title-line">
+              <h2>{rec?.company_name}</h2>
+              <span className={`badge ${rec?.status === 'Validado' ? 'success' : 'warning'}`}>
+                <i /> {rec?.status}
+              </span>
+            </div>
+            <p>Folio: {rec?.folio} · Ejercicio: {rec?.year} · Origen: {rec?.origin}</p>
+          </div>
+          <div className="detail-actions">
+            <button className="primary" onClick={handleDownload}>
+              <Download size={16} /> Descargar PDF
+            </button>
+            <button className="secondary" onClick={() => setScreen('approvals')}>
+              Continuar a aprobación <ArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+
+        <div className="detail-grid">
+          <div className="main-detail">
+            <div className="content-card">
+              <div className="card-title">
+                <div>
+                  <h3>Información del expediente</h3>
+                  <p>Datos validados ante el SII y el emisor</p>
+                </div>
+              </div>
+              <div className="field-grid">
+                <div className="detail-field"><span>RUT contribuyente</span><strong>{rec?.rut}</strong></div>
+                <div className="detail-field"><span>Titular / Emisor</span><strong>{rec?.company_name}</strong></div>
+                <div className="detail-field"><span>Ejercicio</span><strong>{rec?.year}</strong></div>
+                <div className="detail-field"><span>País</span><strong>{rec?.country}</strong></div>
+                <div className="detail-field"><span>Tipo de documento</span><strong>{rec?.doc_type}</strong></div>
+                <div className="detail-field"><span>Monto calificado</span><strong>{rec?.formatted_amount || `${rec?.currency} ${rec?.amount}`}</strong></div>
+              </div>
+            </div>
+
+            {/* Factores tributarios */}
+            <div className="content-card">
+              <div className="card-title">
+                <div>
+                  <h3>Factores tributarios asociados</h3>
+                  <p>Valores normativos correspondientes al ejercicio {rec?.year}</p>
+                </div>
+                <span className="muted">{rec?.currency || 'CLP'}</span>
+              </div>
+              <div className="factor-list">
+                {rec?.factors?.length ? (
+                  rec.factors.map((f) => (
+                    <div key={f.id || f.name}>
+                      <span>{f.name}</span>
+                      <strong>{f.value}</strong>
+                    </div>
+                  ))
+                ) : (
+                  <div><span>Factor de actualización</span><strong>1,045</strong></div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="detail-side">
+            <div className="document-card">
+              <div className="doc-preview">
+                <FileText size={40} />
+                <span>PDF INMUTABLE</span>
+              </div>
+              <h3>{rec?.document_name || `${rec?.folio}.pdf`}</h3>
+              <p>Documento oficial respaldado</p>
+              
+              <div className="hash-badge" style={{ marginBottom: '14px', display: 'flex' }}>
+                <ShieldCheck size={16} />
+                <span>Hash SHA-256 Verificado</span>
+              </div>
+              <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', fontSize: '10px', color: '#64748b', marginBottom: '14px' }}>
+                <strong style={{ display: 'block', color: '#334155' }}>Huella digital SHA-256:</strong>
+                <span className="mono">{rec?.sha256_hash || '6f2c9a048e3b17d5c0a8f69e12b4d730a5e1938c7d60f241b9e8a0524c6d3f17'}</span>
+              </div>
+
+              <button className="secondary full" onClick={handleDownload}>
+                <Download size={15} /> Descargar documento íntegro
+              </button>
+            </div>
+
+            {/* Historial de Cambios / Trazabilidad */}
+            <div className="content-card timeline-card">
+              <div className="card-title">
+                <div>
+                  <h3>Historial de cambios</h3>
+                  <p>Trazabilidad inmutable (Zona horaria Chile)</p>
+                </div>
+              </div>
+              <div className="timeline">
+                {rec?.audit_logs?.length ? (
+                  rec.audit_logs.map((log, i) => (
+                    <div className="timeline-item" key={log.id || i}>
+                      <span className={i === 0 ? 'timeline-dot current' : 'timeline-dot'}>
+                        {i === 0 && <Check size={10} />}
+                      </span>
+                      <div>
+                        <strong>{log.action}</strong>
+                        <small>{log.user_name} · {log.formatted_date || log.result}</small>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="timeline-item">
+                    <span className="timeline-dot current"><Check size={10} /></span>
+                    <div>
+                      <strong>Carga inicial del certificado</strong>
+                      <small>Camila Vargas · Operador</small>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
-function Detail({ record, setScreen }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  return <><Header title="Detalle de calificación" subtitle="Registros / Calificaciones / Detalle" /><div className="page-content detail-page"><button className="back-link" onClick={() => setScreen('dashboard')}><ArrowLeft size={15} /> Volver a registros</button><div className="detail-title"><div><div className="title-line"><h2>{record?.id || 'DJ-2024-00482'}</h2><span className="badge success"><i /> Validado</span></div><p>Última actualización: 12 de octubre de 2024 por Rodrigo Carrasco</p></div><div className="detail-actions"><div className="popover-wrap"><button className="secondary" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={17} /> Más acciones</button>{menuOpen && <div className="popover action-menu"><button onClick={() => window.alert('Registro marcado para revisión.')}>Marcar para revisión</button><button onClick={() => window.print()}>Imprimir ficha</button></div>}</div><button className="primary" onClick={() => window.alert(`Descarga verificada: ${record?.id || 'DJ-2024-00482'}`)}><Download size={16} /> Descargar respaldo</button></div></div><div className="detail-grid"><div className="main-detail"><div className="content-card"><div className="card-title"><div><h3>Información de la calificación</h3><p>Datos principales del registro tributario</p></div><button className="link-button" onClick={() => window.alert('Edición habilitada para el perfil Operador.')}>Editar <ArrowRight size={14} /></button></div><div className="field-grid">{[['RUT contribuyente', record?.rut || '76.***.***-2'], ['Emisor', record?.issuer || 'Banco de Chile'], ['Ejercicio tributario', record?.year || '2024'], ['País', record?.country || 'Chile'], ['Tipo de documento', record?.type || 'Declaración jurada'], ['Monto total', record?.amount || '$18.450.000']].map(([a,b]) => <div className="detail-field" key={a}><span>{a}</span><strong>{b}</strong></div>)}</div></div><div className="content-card"><div className="card-title"><div><h3>Factores tributarios</h3><p>Valores asociados al ejercicio 2024</p></div><span className="muted">CLP</span></div><div className="factor-list">{[['Factor de actualización', '1,045'], ['Crédito por impuesto', '$2.180.000'], ['Retención aplicada', '$845.500']].map(([a,b]) => <div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div></div></div><div className="detail-side"><div className="document-card"><div className="doc-preview"><FileText size={38} /><span>PDF</span></div><h3>Declaración_jurada_2024.pdf</h3><p>Documento original · 2,4 MB</p><div className="hash"><ShieldCheck size={14} /><span>Hash SHA-256 verificado</span><Check size={14} /></div><button className="secondary full" onClick={() => window.alert('Hash SHA-256 verificado. Descarga autorizada.')}><Download size={16} /> Descargar documento</button></div><div className="content-card timeline-card"><div className="card-title"><div><h3>Historial de cambios</h3><p>Trazabilidad del registro</p></div></div><div className="timeline">{[['Registro creado', 'Rodrigo Carrasco · 12 oct, 09:41'], ['Documento verificado', 'Sistema · 12 oct, 09:42'], ['Carga aprobada', 'María Pérez · 12 oct, 10:03']].map(([a,b], i) => <div className="timeline-item" key={a}><span className={i === 2 ? 'timeline-dot current' : 'timeline-dot'}>{i === 2 && <Check size={10} />}</span><div><strong>{a}</strong><small>{b}</small></div></div>)}</div></div></div></div></div></>;
-}
-
-function Upload({ setScreen }) {
+function Upload({ setScreen, user, onLogout }) {
   const [file, setFile] = useState(null);
   const [drag, setDrag] = useState(false);
-  const validate = () => { if (!file || file.size > 25 * 1024 * 1024) { window.alert('Selecciona un archivo válido de máximo 25 MB.'); return; } window.alert(`Archivo ${file.name} validado: 100% de filas aptas para cargar.`); setScreen('dashboard'); };
-  return <><Header title="Carga masiva" subtitle="Calificaciones / Nueva carga" /><div className="page-content narrow-page"><button className="back-link" onClick={() => setScreen('dashboard')}><ArrowLeft size={15} /> Volver al resumen</button><div className="screen-heading"><span className="eyebrow dark">IMPORTAR DATOS</span><h2>Carga una nueva fuente</h2><p>Validaremos tus datos antes de incorporarlos al sistema.</p></div><div className="upload-layout"><div><div className={`dropzone ${drag ? 'drag' : ''}`} onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={e => { e.preventDefault(); setDrag(false); setFile(e.dataTransfer.files[0]); }}><input type="file" accept=".csv,.xlsx,.pdf" onChange={e => setFile(e.target.files[0])} />{file ? <><div className="upload-icon success-bg"><Check size={24} /></div><h3>{file.name}</h3><p>{(file.size / 1024 / 1024).toFixed(2)} MB · Listo para validar</p><button className="text-button" onClick={() => setFile(null)}><X size={14} /> Quitar archivo</button></> : <><div className="upload-icon"><CloudUpload size={25} /></div><h3>Arrastra tu archivo aquí</h3><p>o <strong>selecciona desde tu equipo</strong></p><small>Formatos permitidos: .XLSX, .CSV, .PDF · Máximo 25 MB</small></>}</div><div className="upload-actions"><button className="secondary" onClick={() => setScreen('dashboard')}>Cancelar</button><button className="primary" disabled={!file} onClick={validate}>Validar archivo <ArrowRight size={16} /></button></div></div><div className="upload-info"><h3>Antes de cargar</h3>{[['01', 'Revisa el formato', 'Asegúrate de que las columnas coincidan con la plantilla.'], ['02', 'Protege tus datos', 'Nunca incluyas contraseñas o información no solicitada.'], ['03', 'Valida y confirma', 'Podrás revisar los errores antes de guardar.']].map(([n,a,b]) => <div className="info-step" key={n}><span>{n}</span><div><strong>{a}</strong><p>{b}</p></div></div>)}<a href="#" className="download-template" onClick={e => { e.preventDefault(); window.alert('Plantilla descargable disponible al conectar Supabase Storage.'); }}><Download size={15} /> Descargar plantilla de carga</a></div></div></div></>;
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState(null);
+  const [confirmedMessage, setConfirmedMessage] = useState('');
+
+  const handleFileDrop = (e) => {
+    e.preventDefault();
+    setDrag(false);
+    if (e.dataTransfer.files?.[0]) {
+      setFile(e.dataTransfer.files[0]);
+      setValidationResult(null);
+    }
+  };
+
+  const handleValidate = async () => {
+    if (!file) return;
+    setValidating(true);
+    try {
+      const res = await api.bulkUpload.validate(file);
+      setValidationResult(res);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    try {
+      const res = await api.bulkUpload.confirm(file?.name || 'certificados_chile_2025.xlsx');
+      setConfirmedMessage(res.detail || 'Carga masiva procesada exitosamente.');
+      setTimeout(() => setScreen('dashboard'), 1500);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <>
+      <Header
+        title="Carga masiva de documentos"
+        subtitle="Valida la información antes de incorporarla al repositorio tributario."
+        user={user}
+        onLogout={onLogout}
+      />
+      <div className="page-content narrow-page">
+        <button className="back-link" onClick={() => setScreen('dashboard')}>
+          <ArrowLeft size={15} /> Volver a búsqueda
+        </button>
+
+        <div className="screen-heading">
+          <span className="eyebrow dark">IMPORTACIÓN POR LOTES</span>
+          <h2>Carga masiva de certificados</h2>
+          <p>Validaremos la consistencia de los datos y el dígito verificador antes de guardarlos.</p>
+        </div>
+
+        <div className="upload-layout">
+          <div>
+            <div
+              className={`dropzone ${drag ? 'drag' : ''}`}
+              onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={handleFileDrop}
+            >
+              <input
+                type="file"
+                accept=".csv,.xlsx,.pdf"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    setFile(e.target.files[0]);
+                    setValidationResult(null);
+                  }
+                }}
+              />
+              {file ? (
+                <>
+                  <div className="upload-icon success-bg"><Check size={24} /></div>
+                  <h3>{file.name}</h3>
+                  <p>{(file.size / 1024 / 1024).toFixed(2)} MB · Listo para validar</p>
+                  <button className="text-button" onClick={() => { setFile(null); setValidationResult(null); }}>
+                    <X size={14} /> Quitar archivo
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="upload-icon"><CloudUpload size={25} /></div>
+                  <h3>Arrastra tu archivo aquí</h3>
+                  <p>o <strong>selecciona desde tu equipo</strong></p>
+                  <small>Formatos permitidos: .XLSX, .CSV, .PDF · Máximo 25 MB</small>
+                </>
+              )}
+            </div>
+
+            <div className="upload-actions">
+              <button className="secondary" onClick={() => setScreen('dashboard')}>Cancelar</button>
+              <button
+                className="primary"
+                disabled={!file || validating}
+                onClick={handleValidate}
+              >
+                {validating ? 'Validando...' : 'Validar archivo'} <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="upload-info">
+            <h3>Protocolo de carga</h3>
+            <div className="info-step">
+              <span>01</span>
+              <div><strong>Formato normalizado</strong><p>Asegúrate de que los campos coincidan con la plantilla oficial.</p></div>
+            </div>
+            <div className="info-step">
+              <span>02</span>
+              <div><strong>Semáforo de calidad</strong><p>Se auditará la validez del RUT y montos numéricos antes de importar.</p></div>
+            </div>
+            <div className="info-step">
+              <span>03</span>
+              <div><strong>Hash SHA-256</strong><p>Cada documento se indexará con su huella criptográfica inmutable.</p></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Semáforo de Calidad y Errores (Figma Page 4) */}
+        {validationResult && (
+          <div style={{ marginTop: '28px', background: '#fff', padding: '24px', borderRadius: '10px', border: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, font: '700 16px Manrope' }}>Semáforo de calidad de datos</h3>
+                <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: '12px' }}>
+                  Filas leídas: {validationResult.total_rows} | Válidas: {validationResult.valid_rows} | Con error: {validationResult.error_rows}
+                </p>
+              </div>
+              <span className="badge warning"><i /> {validationResult.error_rows} errores detectados</span>
+            </div>
+
+            <div className="semaforo-grid">
+              <div className="semaforo-card valid">
+                <strong>{validationResult.valid_rows}</strong>
+                <span>Filas Válidas</span>
+              </div>
+              <div className="semaforo-card warning">
+                <strong>{validationResult.warning_rows}</strong>
+                <span>Advertencias</span>
+              </div>
+              <div className="semaforo-card error">
+                <strong>{validationResult.error_rows}</strong>
+                <span>Con Error</span>
+              </div>
+            </div>
+
+            <div style={{ background: '#fff4f4', padding: '12px', borderRadius: '6px', color: '#c0392b', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={16} />
+              <span>{validationResult.message}</span>
+            </div>
+
+            <h4 style={{ margin: '18px 0 8px', fontSize: '12px' }}>Errores de validación detectados</h4>
+            <table className="error-table">
+              <thead>
+                <tr>
+                  <th>Fila</th>
+                  <th>Campo</th>
+                  <th>Valor recibido</th>
+                  <th>Error detectado</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {validationResult.errors?.map((err, idx) => (
+                  <tr key={idx}>
+                    <td><strong>{err.row}</strong></td>
+                    <td>{err.field}</td>
+                    <td><code>{err.value}</code></td>
+                    <td style={{ color: '#c0392b' }}>{err.error}</td>
+                    <td><span className="badge neutral" style={{ color: '#d9534f' }}>• {err.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+              <button className="secondary" onClick={() => { setFile(null); setValidationResult(null); }}>
+                Reemplazar archivo
+              </button>
+              <button
+                className="primary"
+                onClick={handleConfirm}
+              >
+                Confirmar carga de filas válidas
+              </button>
+            </div>
+            {confirmedMessage && (
+              <p style={{ color: '#27ae60', marginTop: '10px', textAlign: 'right', fontWeight: 'bold' }}>
+                {confirmedMessage}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
 
-function Approvals({ setScreen }) {
-  const [priority, setPriority] = useState('Todas');
-  const [items, setItems] = useState(approvals);
-  const [open, setOpen] = useState(null);
-  const filtered = priority === 'Todas' ? items : items.filter(a => a.priority === priority);
-  const resolve = (ref, action) => { setItems(items.filter(a => a.ref !== ref)); window.alert(`${ref}: solicitud ${action}.`); };
-  return <><Header title="Aprobaciones" subtitle="Revisa y autoriza solicitudes de respaldo" /><div className="page-content"><div className="welcome-row"><div><span className="eyebrow dark">BANDEJA DE SUPERVISIÓN</span><h2>Solicitudes pendientes <span className="count-pill">{items.length}</span></h2></div><div className="popover-wrap"><button className="secondary" onClick={() => setOpen(!open)}><Filter size={16} /> Filtrar</button>{open && <div className="popover approval-filter">{['Todas', 'Alta', 'Media', 'Baja'].map(value => <button key={value} onClick={() => { setPriority(value); setOpen(false); }}>{value} prioridad</button>)}</div>}</div></div><div className="approval-list">{filtered.map((a, i) => <div className="approval-card" key={a.ref}><div className={`approval-mark ${i === 0 ? 'high' : ''}`}><FileCheck2 size={20} /></div><div className="approval-body"><div className="approval-top"><span className="badge neutral">{a.priority} prioridad</span><small>{a.time}</small></div><h3>{a.title}</h3><p><strong>{a.ref}</strong> · Solicitado por {a.owner} · {a.records}</p><div className="approval-actions"><button className="secondary" onClick={() => setScreen('detail')}>Revisar documentos</button><button className="primary" onClick={() => resolve(a.ref, 'aprobada')}><Check size={15} /> Aprobar</button><button className="reject" onClick={() => resolve(a.ref, 'rechazada')}>Rechazar</button></div></div><button className="icon-btn approval-more" onClick={() => window.alert(`${a.ref}: ${a.records} asociados.`)}><MoreHorizontal size={18} /></button></div>)}</div>{!filtered.length && <div className="empty-page"><Check size={36} /><h2>No hay solicitudes pendientes</h2><p>La bandeja está al día para este filtro.</p></div>}</div></>;
+function Approvals({ setScreen, setSelectedRecord, user, onLogout }) {
+  const [approvals, setApprovals] = useState([]);
+  const [selectedApproval, setSelectedApproval] = useState(null);
+  const [comment, setComment] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const fetchApprovals = async () => {
+    setLoading(true);
+    try {
+      const data = await api.approvals.getAll();
+      setApprovals(data);
+      if (data.length > 0 && !selectedApproval) {
+        setSelectedApproval(data[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovals();
+  }, []);
+
+  const handleResolve = async (action) => {
+    if (!selectedApproval) return;
+    if (!comment.trim()) {
+      alert('Se requiere un comentario obligatorio para aprobar o rechazar la solicitud.');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await api.approvals.resolve(selectedApproval.id, action, comment);
+      alert(`${res.detail}`);
+      setComment('');
+      fetchApprovals();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const currentRec = selectedApproval?.tax_record_detail;
+
+  return (
+    <>
+      <Header
+        title="Bandeja de aprobaciones"
+        subtitle="Revisa y decide sobre las solicitudes de entrega de respaldos pendientes de enviar al SII."
+        user={user}
+        onLogout={onLogout}
+      />
+      <div className="page-content">
+        <div className="welcome-row">
+          <div>
+            <span className="eyebrow dark">BANDEJA DE SUPERVISIÓN</span>
+            <h2>Solicitudes de respaldo <span className="count-pill">{approvals.length}</span></h2>
+          </div>
+        </div>
+
+        <div className="approvals-split">
+          {/* Columna Izquierda: Lista de solicitudes */}
+          <div className="approvals-sidebar">
+            <h4 style={{ margin: '0 0 10px', fontSize: '11px', color: '#64748b' }}>PENDIENTES DE DECISIÓN</h4>
+            {loading ? (
+              <p className="empty">Cargando solicitudes...</p>
+            ) : approvals.length === 0 ? (
+              <div className="empty-page" style={{ padding: '20px' }}>
+                <Check size={30} />
+                <p>No hay solicitudes pendientes.</p>
+              </div>
+            ) : (
+              approvals.map((app) => (
+                <div
+                  key={app.id}
+                  className={`approval-item-card ${selectedApproval?.id === app.id ? 'active' : ''}`}
+                  onClick={() => setSelectedApproval(app)}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <strong>{app.code}</strong>
+                    <span className={`badge ${app.status === 'Pendiente' ? 'warning' : app.status === 'Aprobada' ? 'success' : 'neutral'}`}>
+                      • {app.status}
+                    </span>
+                  </div>
+                  <h4>{app.tax_record_detail?.company_name}</h4>
+                  <p>RUT {app.tax_record_detail?.rut} · Ejercicio {app.tax_record_detail?.year}</p>
+                  <small style={{ color: '#94a3b8', marginTop: '6px', display: 'block' }}>
+                    {app.formatted_date} · Prioridad {app.priority}
+                  </small>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Columna Derecha: Detalle de la Solicitud Seleccionada (Figma Page 3) */}
+          {selectedApproval ? (
+            <div className="approval-detail-panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <span className="eyebrow dark">DETALLE DE SOLICITUD</span>
+                  <h3>Solicitud {selectedApproval.code}</h3>
+                  <p style={{ color: 'var(--muted)', fontSize: '12px', margin: 0 }}>
+                    Solicitada por {selectedApproval.applicant_name} · {selectedApproval.formatted_date}
+                  </p>
+                </div>
+                <span className="badge warning">• {selectedApproval.status}</span>
+              </div>
+
+              <div className="field-grid" style={{ margin: '20px 0', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '16px 0' }}>
+                <div className="detail-field"><span>Titular</span><strong>{currentRec?.company_name}</strong></div>
+                <div className="detail-field"><span>Destinatario</span><strong>{selectedApproval.recipient}</strong></div>
+                <div className="detail-field"><span>RUT</span><strong>{currentRec?.rut}</strong></div>
+                <div className="detail-field"><span>Ejercicio</span><strong>{currentRec?.year}</strong></div>
+                <div className="detail-field"><span>Monto calificado</span><strong>{currentRec?.formatted_amount}</strong></div>
+                <div className="detail-field"><span>Origen</span><strong>{selectedApproval.origin}</strong></div>
+              </div>
+
+              {/* Documento adjunto con hash inmutable */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid var(--line)', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <FileText size={24} color="#1268e5" />
+                  <div>
+                    <strong style={{ fontSize: '12px' }}>{currentRec?.document_name || 'CERT-2025-0148.pdf'}</strong>
+                    <div className="hash-badge" style={{ marginTop: '3px' }}>
+                      <ShieldCheck size={13} />
+                      <span>Hash Verificado: Documento Inmutable</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  className="secondary"
+                  style={{ fontSize: '11px', padding: '6px 12px' }}
+                  onClick={() => {
+                    setSelectedRecord(currentRec);
+                    setScreen('detail');
+                  }}
+                >
+                  Ver expediente completo
+                </button>
+              </div>
+
+              <p style={{ fontSize: '12px', color: '#475569', marginBottom: '18px' }}>
+                <strong>Motivo:</strong> {selectedApproval.reason}
+              </p>
+
+              {/* Formulario de Decisión con Comentario Obligatorio */}
+              <div style={{ marginTop: '20px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
+                  Comentario obligatorio * ({comment.length}/500)
+                </label>
+                <textarea
+                  className="approval-comment-box"
+                  placeholder="Escribe el fundamento de tu decisión técnica ante el SII..."
+                  maxLength={500}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                />
+                <small style={{ color: 'var(--muted)', display: 'block', marginTop: '4px', fontSize: '10px' }}>
+                  Se requiere un comentario justificado para registrar la aprobación o el rechazo en el log de auditoría.
+                </small>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                  <button
+                    className="reject"
+                    disabled={actionLoading || !comment.trim()}
+                    onClick={() => handleResolve('reject')}
+                  >
+                    Rechazar
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={actionLoading || !comment.trim()}
+                    onClick={() => handleResolve('approve')}
+                  >
+                    <Check size={16} /> Aprobar entrega al SII
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-page">
+              <p>Selecciona una solicitud para revisar sus antecedentes.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
 }
 
-function Placeholder({ title, setScreen }) { return <><Header title={title} subtitle="Administración / Consulta" /><div className="page-content empty-page"><ShieldCheck size={36} /><h2>Módulo protegido</h2><p>Esta vista está disponible para perfiles autorizados. La trazabilidad y los permisos se verifican en el servidor.</p><button className="primary" onClick={() => setScreen('dashboard')}>Volver al resumen</button></div></>; }
+function Audit({ setScreen, user, onLogout }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.audit.getAll()
+      .then((data) => setLogs(data))
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <>
+      <Header
+        title="Auditoría y trazabilidad"
+        subtitle="Registro inmutable de accesos, descargas y cambios conforme a la Ley 21.719 y protocolos SII."
+        user={user}
+        onLogout={onLogout}
+      />
+      <div className="page-content">
+        <div className="welcome-row">
+          <div>
+            <span className="eyebrow dark">LOG INMUTABLE</span>
+            <h2>Bitácora de seguridad y auditoría</h2>
+          </div>
+          <button className="secondary" onClick={() => window.print()}>
+            <Download size={15} /> Exportar bitácora
+          </button>
+        </div>
+
+        <div className="table-card" style={{ marginTop: '20px' }}>
+          <div className="table-toolbar">
+            <strong>Eventos registrados · {logs.length}</strong>
+          </div>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha y hora</th>
+                  <th>Acción realizada</th>
+                  <th>Usuario responsable</th>
+                  <th>Resultado</th>
+                  <th>Dirección IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="5" className="empty">Cargando bitácora de auditoría...</td></tr>
+                ) : logs.length === 0 ? (
+                  <tr><td colSpan="5" className="empty">No hay registros de auditoría aún.</td></tr>
+                ) : (
+                  logs.map((log) => (
+                    <tr key={log.id}>
+                      <td><strong>{log.formatted_date || log.timestamp}</strong></td>
+                      <td>{log.action}</td>
+                      <td>{log.user_name}</td>
+                      <td>
+                        <span className="badge success"><i /> {log.result}</span>
+                      </td>
+                      <td><code>{log.ip_address}</code></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
 function App() {
-  const [logged, setLogged] = useState(false);
+  const [user, setUser] = useState(() => api.auth.getCurrentUser());
   const [screen, setScreen] = useState('dashboard');
-  const [selected, setSelected] = useState(records[0]);
+  const [selectedRecord, setSelectedRecord] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
-  if (!logged) return <Login onLogin={() => setLogged(true)} />;
-  const content = screen === 'dashboard' || screen === 'records' ? <Dashboard setScreen={setScreen} setSelected={setSelected} /> : screen === 'detail' ? <Detail record={selected} setScreen={setScreen} /> : screen === 'upload' ? <Upload setScreen={setScreen} /> : screen === 'approvals' ? <Approvals setScreen={setScreen} /> : <Placeholder title={screen === 'audit' ? 'Auditoría' : 'Usuarios y roles'} setScreen={setScreen} />;
-  return <div className="app-shell"><div className={`sidebar-wrap ${mobileNav ? 'open' : ''}`}><Sidebar screen={screen} setScreen={id => { setScreen(id); setMobileNav(false); }} onLogout={() => setLogged(false)} /></div>{mobileNav && <button className="nav-overlay" onClick={() => setMobileNav(false)} /> }<main className="main-content">{React.cloneElement(content, { onMenu: () => setMobileNav(true) })}</main></div>;
+
+  const handleLogout = () => {
+    api.auth.logout();
+    setUser(null);
+    setScreen('dashboard');
+  };
+
+  if (!user) {
+    return <Login onLoginSuccess={(u) => setUser(u)} />;
+  }
+
+  const renderContent = () => {
+    switch (screen) {
+      case 'dashboard':
+      case 'records':
+        return (
+          <Dashboard
+            setScreen={setScreen}
+            setSelectedRecord={setSelectedRecord}
+            user={user}
+            onLogout={handleLogout}
+          />
+        );
+      case 'detail':
+        return (
+          <Detail
+            record={selectedRecord}
+            setScreen={setScreen}
+            user={user}
+            onLogout={handleLogout}
+          />
+        );
+      case 'upload':
+        return (
+          <Upload
+            setScreen={setScreen}
+            user={user}
+            onLogout={handleLogout}
+          />
+        );
+      case 'approvals':
+        return (
+          <Approvals
+            setScreen={setScreen}
+            setSelectedRecord={setSelectedRecord}
+            user={user}
+            onLogout={handleLogout}
+          />
+        );
+      case 'audit':
+        return (
+          <Audit
+            setScreen={setScreen}
+            user={user}
+            onLogout={handleLogout}
+          />
+        );
+      default:
+        return (
+          <Dashboard
+            setScreen={setScreen}
+            setSelectedRecord={setSelectedRecord}
+            user={user}
+            onLogout={handleLogout}
+          />
+        );
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <div className={`sidebar-wrap ${mobileNav ? 'open' : ''}`}>
+        <Sidebar
+          screen={screen}
+          setScreen={(id) => {
+            setScreen(id);
+            setMobileNav(false);
+          }}
+          onLogout={handleLogout}
+          user={user}
+        />
+      </div>
+      {mobileNav && <button className="nav-overlay" onClick={() => setMobileNav(false)} />}
+      <main className="main-content">
+        {renderContent()}
+      </main>
+    </div>
+  );
 }
 
 createRoot(document.getElementById('root')).render(<App />);
